@@ -1,0 +1,22 @@
+services:
+  keepalived:
+    image: osixia/keepalived:2.0.20
+    container_name: keepalived
+    network_mode: host
+    privileged: true
+
+    cap_add:
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+
+    volumes:
+      - ./keepalived.conf.template:/usr/local/etc/keepalived/keepalived.conf.template
+      - ./ip.sh:/usr/local/etc/keepalived/ip.sh
+      - ./start.sh:/start.sh
+      - ./check_docker.sh:/usr/local/bin/check_docker.sh
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    command: ["/bin/sh", "/start.sh"]
+
+    restart: always

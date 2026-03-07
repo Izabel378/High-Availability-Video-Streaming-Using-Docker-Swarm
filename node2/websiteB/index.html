@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Website B</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(135deg, #e0f2fe, #f8fafc);
+      color: #0f172a;
+    }
+
+    header {
+      padding: 18px 40px;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #2563eb;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      padding: 50px 25px;
+    }
+
+    h1 {
+      font-size: 38px;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: #64748b;
+      margin-bottom: 30px;
+    }
+
+    .cards {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      background: white;
+      padding: 16px 20px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      min-width: 200px;
+    }
+
+    .label {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .value {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 5px;
+      color: #2563eb;
+    }
+
+    .servedby {
+      color: #16a34a;
+    }
+
+    .video-card {
+      text-align: center;
+    }
+
+    video {
+      width: 75%;
+      height: 350px;
+      object-fit: cover;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+
+    .controls {
+      margin-top: 15px;
+    }
+
+    .controls button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      margin: 5px;
+      transition: 0.2s;
+    }
+
+    .controls button:hover {
+      background: #1d4ed8;
+    }
+
+    footer {
+      text-align: center;
+      padding: 30px;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .notice {
+      text-align: center;
+      font-size: 13px;
+      margin-top: 15px;
+      color: #64748b;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+   Website B - High Availability Video Service
+</header>
+
+<div class="container">
+
+  <h1>High Availability Video Streaming</h1>
+
+  <div class="cards">
+
+    <div class="card">
+      <div class="label">Currently Served By</div>
+      <div class="value servedby" id="servedby">Loading...</div>
+    </div>
+  </div>
+
+  <div class="card video-card">
+
+    <video id="demoVideo" controls>
+      <source src="video2.mp4" type="video/mp4">
+      Your browser does not support HTML5 video.
+    </video>
+
+  </div>
+
+</div>
+
+<footer>
+  Docker Swarm • Keepalived • Website Demo
+</footer>
+
+<script>
+
+fetch('/servedby')
+  .then(response => response.text())
+  .then(hostname => {
+    document.getElementById('servedby').innerText = hostname;
+  });
+</script>
+
+</body>
+</html>

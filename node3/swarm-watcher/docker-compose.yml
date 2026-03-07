@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  watcher:
+    image: swarm-watcher:1.0
+
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.watcher == true
+
+    configs:
+      - source: node-dict
+        target: /config/dict.yaml
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+configs:
+  node-dict:
+    external: true

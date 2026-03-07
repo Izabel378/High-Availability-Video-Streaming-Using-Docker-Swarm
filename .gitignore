@@ -1,0 +1,8 @@
+#generated keepalived configs
+keepalived.conf
+
+# docker runtime
+*.log
+
+# editor files
+*.swp
