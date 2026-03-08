@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+
+  websiteA:
+    image: izabella03/weba:1.2
+    ports:
+      - "8080:80"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.webA == true
+        preferences:
+          - spread: node.labels.primaryA
+      restart_policy:
+        condition: any
+
+  websiteB:
+    image: izabella03/webb:1.2
+    ports:
+      - "8081:80"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.webB == true
+        preferences:
+          - spread: node.labels.primaryB
+      restart_policy:
+        condition: any
+
