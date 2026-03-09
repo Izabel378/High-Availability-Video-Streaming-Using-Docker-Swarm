@@ -1,4 +1,4 @@
-# High Availability Video Streaming using Docker Swarm and Keepalived
+# High Availability Video Streaming using Docker Swarm 
 
 ## Overview
 
