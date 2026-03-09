@@ -9,7 +9,7 @@ The system runs on three nodes connected in a Docker Swarm cluster and host two 
 
 If one node fails, another node automatically takes over the Virtual IP, allowing the services to remain accessible without interruption.
 
-This project demonstrates:
+This project demonstrates 4 phases:
 
 - Creating a Docker Swarm cluster
 - Virtual IP failover using VRRP and Keepalived
@@ -108,7 +108,7 @@ Each node uses only its corresponding folder after cloning the repository.
 
 ## Project Workflow
 
-The project is implemented in the following major sections:
+The project is implemented in the following 4 major phases:
 
 1. Docker Swarm Cluster Setup
 2. Keepalived VIP Failover Configuration
