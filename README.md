@@ -456,8 +456,8 @@ promote node2 and node3 to manager nodes.
 Run this on node1:
 
 ```bash
-docker node promote node2
-docker node promote node3
+sudo docker node promote node2
+sudo docker node promote node3
 ```
 Check the nodes by running the command:
 ```bash
@@ -562,7 +562,7 @@ Identity -> this is node 2
 View watcher logs by running this command on node 3:
 
 ```bash
-docker service logs swarm-watcher_watcher
+sudo docker service logs swarm-watcher_watcher
 ```
 ---
 ## Phase 4 - Deploy Highly Available Website Services
@@ -617,11 +617,11 @@ Node labels are used to control where services are scheduled.
 
 Run on a manager node:
 ```bash
-docker node update --label-add webA=true node1
-docker node update --label-add primaryA=true node1
+sudo docker node update --label-add webA=true node1
+sudo docker node update --label-add primaryA=true node1
 
-docker node update --label-add webB=true node2
-docker node update --label-add primaryB=true node2
+sudo docker node update --label-add webB=true node2
+sudo docker node update --label-add primaryB=true node2
 ```
 Verify the label on each node:
 
