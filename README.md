@@ -34,29 +34,6 @@ If a node fails:
 3. The Virtual IP moves to the new node.
 4. Docker Swarm reschedules the affected service if required.
 
----
-
-## Failover Workflow
-
-### Normal Operation
-
-1. Node1 owns VIP `.200`.
-2. Node2 owns VIP `.201`.
-3. Node3 acts as a standby node.
-4. Keepalived continuously exchanges VRRP heartbeat messages.
-5. Docker Swarm runs services across the cluster.
-
-### Node Failure
-
-If a node fails:
-
-1. Keepalived stops receiving VRRP heartbeats.
-2. A failover election occurs to find the next highest priority node for the VIP owned by the failed node.
-3. The highest-priority standby node becomes the new MASTER.
-4. The Virtual IP moves to the new node.
-5. Docker Swarm reschedules services if necessary.
-
-The system continues functioning without manual intervention.
 
 ---
 
@@ -130,7 +107,6 @@ VirtualBox automatically creates a private network:
 192.168.56.0/24
 ```
 
-This is a local-only network used by VirtualBox VMs so the machines can communicate with each other.
 
 Example IP assignment used in this setup:
 
@@ -271,23 +247,9 @@ ip a
 
 You should see the configured IP on **interface `enp0s8`**.
 
----
-
-### Step 5-Test Network Connectivity
-
-Test communication between nodes.
-
-On **node1**:
-
-```bash
-ping 192.168.56.12
-ping 192.168.56.13
-```
-
-If the network is configured correctly, the nodes should **successfully ping each other**.
 
 ---
-### Step 6- Install Docker on all VMs
+### Step 5- Install Docker on all VMs
 ```bash
 sudo apt update
 sudo apt install -y ca-certificates curl gnupg
@@ -304,7 +266,7 @@ sudo systemctl enable docker
 sudo systemctl start docker
 sudo docker run hello-world
 ```
-### Step 7- Create Docker Swarm Cluster
+### Step 6- Create Docker Swarm Cluster
 - Init Swarm on node 1 
     ```bash
     docker swarm init --advertise-addr 192.168.56.11
@@ -469,376 +431,6 @@ Now run ```sudo systemctl start docker``` on node 1 to migrate VIPs .200 and .10
 
 Test the same on node 2.
 
----
-
-## Files Used in This Setup
-
-The following files are used to configure and run Keepalived.
-
-
-
-### `check_docker.sh`
-
-This script monitors the Docker daemon.
-
-Keepalived periodically runs this script.  
-If Docker stops running, the script returns a failure code and the node's VRRP priority is reduced, triggering VIP failover to another node.
-
-Create the script:
-
-```bash
-sudo nano check_docker.sh
-```
-
-```bash
-#!/bin/bash
-pgrep dockerd > /dev/null 2>&1
-exit $?
-```
-
-
-
----
-
-### `start.sh`
-
-This script generates the final `keepalived.conf` from the template.
-
-The dynamic VIP value is read from `ip.sh`, and the placeholder in the configuration template is replaced before Keepalived starts.
-
-```bash
-#!/bin/sh
-
-VIP=$(cat /usr/local/etc/keepalived/ip.sh | tr -d '\n')
-
-sed "s|VIP_PLACEHOLDER|$VIP|g" \
-/usr/local/etc/keepalived/keepalived.conf.template \
-> /usr/local/etc/keepalived/keepalived.conf
-
-exec /container/tool/run
-```
-
----
-
-### `ip.sh`
-
-This file stores the dynamic VIP address.
-
-Example:
-
-```bash
-192.168.56.102/24
-```
-
-This value replaces `VIP_PLACEHOLDER` inside `keepalived.conf.template` during container startup.
-
----
-
-### `docker-compose.yml`
-
-Keepalived is deployed inside a container using Docker Compose.
-
-```yaml
-services:
-  keepalived:
-    image: osixia/keepalived:2.0.20
-    container_name: keepalived
-    network_mode: host
-    privileged: true
-
-    cap_add:
-      - NET_ADMIN
-      - NET_BROADCAST
-      - NET_RAW
-
-    volumes:
-      - ./keepalived.conf.template:/usr/local/etc/keepalived/keepalived.conf.template
-      - ./ip.sh:/usr/local/etc/keepalived/ip.sh
-      - ./start.sh:/start.sh
-      - ./check_docker.sh:/usr/local/bin/check_docker.sh
-      - /var/run/docker.sock:/var/run/docker.sock
-
-    command: ["/bin/sh", "/start.sh"]
-
-    restart: always
-```
-
-
-### Keepalived Configuration
-
-The Keepalived configuration is defined inside **`keepalived.conf.template`**.
-
-This template contains:
-
-- VRRP configuration
-- Static VIPs
-- A placeholder for the dynamic VIP.
-
----
-
-### Node 1 - `keepalived.conf.template`
-
-Node1 is the primary owner of VIP .200 and the dynamic VIP .102.
-
-```conf
-global_defs {
-    router_id node1
-    default_interface enp0s8
-    script_user root
-    enable_script_security
-}
-
-vrrp_script chk_docker {
-    script "/usr/local/bin/check_docker.sh"
-    interval 3
-    fall 3
-    rise 2
-    weight -60
-}
-
-vrrp_instance VI_200 {
-    state MASTER
-    interface enp0s8
-    virtual_router_id 51
-    priority 250
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        192.168.56.200/24
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-
-vrrp_instance VI_201 {
-    state BACKUP
-    interface enp0s8
-    virtual_router_id 52
-    priority 100
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        192.168.56.201/24
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-
-vrrp_instance VIP_DYNAMIC {
-    state MASTER
-    interface enp0s8
-    virtual_router_id 53
-    priority 250
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        VIP_PLACEHOLDER
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-```
-
----
-
-### Node 2 - `keepalived.conf.template`
-
-Node2 initially owns VIP .201.
-
-- `global_defs` and `vrrp_script chk_docker` configuration are the same as Node1.
-- `VI_200` is configured as BACKUP with priority 100.
-- `VI_201` is configured as MASTER with priority 250.
-- `VIP_DYNAMIC` is configured as BACKUP with priority 100
-
-```bash
-global_defs {
-    router_id node2
-    default_interface enp0s8
-    script_user root
-    enable_script_security
-}
-
-vrrp_script chk_docker {
-    script "/usr/local/bin/check_docker.sh"
-    interval 3
-    fall 3
-    rise 2
-    weight -60
-}
-
-vrrp_instance VI_200 {
-    state BACKUP
-    interface enp0s8
-    virtual_router_id 51
-    priority 100
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        192.168.56.200/24
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-
-vrrp_instance VI_201 {
-    state MASTER
-    interface enp0s8
-    virtual_router_id 52
-    priority 250
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        192.168.56.201/24
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-
-vrrp_instance VIP_DYNAMIC {
-    state BACKUP
-    interface enp0s8
-    virtual_router_id 53
-    priority 100
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        VIP_PLACEHOLDER
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-```
----
-
-### Node 3 - `keepalived.conf.template`
-
-Node3 acts as the standby failover node for the cluster.
-
-- `global_defs` and `vrrp_script chk_docker` configuration are the same as Node1.
-- `VI_200` is configured as BACKUP with priority 200.
-- `VI_201` is configured as BACKUP with priority 200.
-- `VIP_DYNAMIC` is configured as BACKUP with priority 200.
-```bash
-global_defs {
-    router_id node3
-    default_interface enp0s8
-    script_user root
-    enable_script_security
-}
-
-vrrp_script chk_docker {
-    script "/usr/local/bin/check_docker.sh"
-    interval 3
-    fall 3
-    rise 2
-    weight -60
-}
-
-vrrp_instance VI_200 {
-    state BACKUP
-    interface enp0s8
-    virtual_router_id 51
-    priority 200
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        192.168.56.200/24
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-
-vrrp_instance VI_201 {
-    state BACKUP
-    interface enp0s8
-    virtual_router_id 52
-    priority 200
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        192.168.56.201/24
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-
-vrrp_instance VIP_DYNAMIC {
-    state BACKUP
-    interface enp0s8
-    virtual_router_id 53
-    priority 200
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        VIP_PLACEHOLDER
-    }
-
-    track_script {
-        chk_docker
-    }
-}
-```
 
 ---
 ## Phase 3 - Create a swarm_watcher service that detects the failed node and its identity configuration (replicated only on node3)
@@ -904,8 +496,6 @@ sudo docker node inspect node3 --format '{{ .Spec.Labels }}'
 ---
 ### Step 3 — Create the Swarm Config
 
-Docker Swarm configs allow configuration files to be securely mounted inside services.
-
 Create the docker swarm config `node-dict` from `dict.yaml` file located in the swarm-watcher directory by running the command:
 
 ```bash
@@ -921,14 +511,6 @@ sudo docker config ls
 
 ### Step 4 — Build the Swarm Watcher Image
 
-The Dockerfile builds a lightweight Alpine container that installs:
-
-- bash
-- docker-cli
-- jq
-- yq
-
-These tools allow the container to listen to Docker node events and parse the YAML dictionary.
 
 Build the image:
 
@@ -982,111 +564,6 @@ View watcher logs by running this command on node 3:
 ```bash
 docker service logs swarm-watcher_watcher
 ```
-## Files Used in This Setup
-
-The following files are used to deploy the **Swarm Watcher service** that monitors node failures in the Docker Swarm cluster.
-
-### 1. `swarm_watcher.sh`
-
-This script listens for Docker Swarm node events.  
-If a node goes down, it retrieves the node identity from `dict.yaml` and prints an alert.
-
-```bash
-#!/bin/bash
-
-DICT=/config/dict.yaml
-
-echo "Starting swarm monitor..."
-echo ""
-
-docker events --filter type=node --format '{{json .}}' |
-while read -r event
-do
-    docker node ls --format '{{.Hostname}} {{.Status}}' |
-    while read NODE STATUS
-    do
-        if [ "$STATUS" = "Down" ]; then
-            VALUE=$(yq e ".${NODE}" "$DICT")
-
-            [ "$VALUE" = "null" ] && VALUE="Unknown node"
-
-            echo "$(date '+%H:%M:%S') ALERT $NODE is DOWN"
-            echo "$(date '+%H:%M:%S') Identity -> $VALUE"
-            echo ""
-        fi
-    done
-done
-```
-
----
-
-### 2. `docker-compose.yml`
-
-This file deploys the Swarm Watcher service as a Docker Swarm stack.
-
-- The service runs only on node3.
-- It loads `dict.yaml` using a Docker Swarm config.
-
-```yaml
-version: "3.9"
-
-services:
-  watcher:
-    image: swarm-watcher:1.0
-
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-      placement:
-        constraints:
-          - node.labels.watcher == true
-
-    configs:
-      - source: node-dict
-        target: /config/dict.yaml
-
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-configs:
-  node-dict:
-    external: true
-```
-
----
-
-### 3. `dict.yaml`
-
-This file stores the **identity mapping of swarm nodes**.
-
-```yaml
-node1: "this is node 1"
-node2: "this is node 2"
-node3: "this is node 3"
-```
-
-This file is registered as a **Docker Swarm config** and mounted inside the container at:
-
-```
-/config/dict.yaml
-```
-### 4. `Dockerfile`
-This Dockerfile builds the Swarm Watcher container image used by the service.
-
-```dockerfile
-FROM alpine:latest
-
-RUN apk add --no-cache bash jq yq docker-cli
-
-WORKDIR /app
-
-COPY swarm_watcher.sh .
-
-RUN chmod +x swarm_watcher.sh
-
-CMD ["bash", "/app/swarm_watcher.sh"]
-```
 ---
 ## Phase 4 - Deploy Highly Available Website Services
 
@@ -1129,8 +606,8 @@ Before deploying services, ensure all nodes are managers to maintain quorum.
 Run on **node1**:
 
 ```bash
-docker node promote node2
-docker node promote node3
+sudo docker node promote node2
+sudo docker node promote node3
 ```
 ---
 
